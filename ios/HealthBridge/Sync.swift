@@ -25,7 +25,7 @@ final class Sync {
         ("walking_hr_avg", .walkingHeartRateAverage, HKUnit.count().unitDivided(by: .minute()), 1),
         ("spo2_pct", .oxygenSaturation, .percent(), 100),
         ("resp_rate", .respiratoryRate, HKUnit.count().unitDivided(by: .minute()), 1),
-        ("vo2max", .vo2Max, HKUnit(from: "ml/kg*min"), 1),
+        ("vo2max", .vo2Max, HKUnit.literUnit(with: .milli).unitDivided(by: HKUnit.gramUnit(with: .kilo).unitMultiplied(by: .minute())), 1),
         ("bp_sys", .bloodPressureSystolic, .millimeterOfMercury(), 1),
         ("bp_dia", .bloodPressureDiastolic, .millimeterOfMercury(), 1),
         ("weight_kg", .bodyMass, .gramUnit(with: .kilo), 1),
@@ -42,8 +42,9 @@ final class Sync {
     /// merging overlapping samples from different sources so nothing is counted twice.
     private func sleep(endingOn dayStart: Date) async -> [String: Double]? {
         let cal = Calendar.current
-        guard let from = cal.date(byAdding: .hour, value: -6, to: dayStart),
-              let to = cal.date(byAdding: .hour, value: 12, to: dayStart) else { return nil }
+        guard let prev = cal.date(byAdding: .day, value: -1, to: dayStart),
+              let from = cal.date(bySettingHour: 18, minute: 0, second: 0, of: prev),
+              let to = cal.date(bySettingHour: 12, minute: 0, second: 0, of: dayStart) else { return nil }
         let samples: [HKCategorySample] = await withCheckedContinuation { c in
             let pred = HKQuery.predicateForSamples(withStart: from, end: to, options: [])
             store.execute(HKSampleQuery(sampleType: HKCategoryType(.sleepAnalysis), predicate: pred, limit: HKObjectQueryNoLimit,
@@ -67,9 +68,12 @@ final class Sync {
                                       HKCategoryValueSleepAnalysis.asleepDeep.rawValue, HKCategoryValueSleepAnalysis.asleepREM.rawValue]
         let asleep = samples.filter { asleepValues.contains($0.value) }
         guard !asleep.isEmpty else { return nil }
-        return ["sleep_min": merged(asleep),
-                "deep_min": merged(samples.filter { $0.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue }),
-                "rem_min": merged(samples.filter { $0.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue })]
+        var out = ["sleep_min": merged(asleep)]
+        let deep = samples.filter { $0.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue }
+        let rem = samples.filter { $0.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue }
+        if !deep.isEmpty { out["deep_min"] = merged(deep) }  // omitted when the source has no stage data
+        if !rem.isEmpty { out["rem_min"] = merged(rem) }
+        return out
     }
 
     func authorize() async -> String {

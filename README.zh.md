@@ -69,7 +69,9 @@ python3 mac/healthbridge.py doctor          # 或加 --json
 
 ## 接上你自己的分析
 
-在 `~/.config/healthbridge/config.json` 里加 `"post_sync_cmd": ["python3", "~/my_health_rules.py"]`，接收端每次更新完档案就会跑它，比如提醒静息心率异常升高，或把数据写进你自己的笔记。
+在 `~/.config/healthbridge/config.json` 里加 `"post_sync_cmd": ["python3", "~/my_health_rules.py"]`，接收端每次成功更新档案后就会跑它（超时 5 分钟），比如提醒静息心率异常升高，或把数据写进你自己的笔记。改完配置要重启 `serve`；配置文件如果别的用户也能读写，接收端会拒绝启动。
+
+睡眠按前一晚 18:00 到当天 12:00 统计，白天午睡不算在内。
 
 ## 安全设计
 

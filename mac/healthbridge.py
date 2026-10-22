@@ -186,11 +186,18 @@ def serve():
             pending.wait()
             time.sleep(5)
             pending.clear()
-            subprocess.run([sys.executable, __file__, "archive"], stdout=subprocess.DEVNULL)
-            hook = cfg.get("post_sync_cmd")  # optional: your own script, run after each archive rebuild
-            if hook:
-                subprocess.run([os.path.expanduser(a) for a in hook], stdout=subprocess.DEVNULL)
+            try:
+                ok = subprocess.run([sys.executable, __file__, "archive"], stdout=subprocess.DEVNULL, timeout=600).returncode == 0
+                if ok and hook:
+                    subprocess.run([os.path.expanduser(a) for a in hook], stdout=subprocess.DEVNULL, timeout=300)
+            except Exception as e:  # never let a failure stop future rebuilds
+                sys.stderr.write(f"archive/hook failed: {e}\n")
 
+    hook = cfg.get("post_sync_cmd")  # optional: your own script, run after each successful archive rebuild
+    if hook is not None and not (isinstance(hook, list) and hook and all(isinstance(a, str) for a in hook)):
+        sys.exit('post_sync_cmd must be a list of strings, e.g. ["python3", "~/rules.py"]')
+    if hook and CONFIG.stat().st_mode & 0o077:
+        sys.exit(f"refusing post_sync_cmd: {CONFIG} must not be readable/writable by others (chmod 600)")
     out.mkdir(parents=True, exist_ok=True, mode=0o700)
     threading.Thread(target=archiver, daemon=True).start()
     ThreadingHTTPServer.daemon_threads = True

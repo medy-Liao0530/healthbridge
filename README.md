@@ -69,7 +69,9 @@ python3 mac/healthbridge.py doctor          # or --json
 
 ## Hook your own analysis
 
-Set `"post_sync_cmd": ["python3", "~/my_health_rules.py"]` in `~/.config/healthbridge/config.json` and the receiver runs it after every archive rebuild — e.g. to flag a resting-HR spike or write numbers into your own notes.
+Set `"post_sync_cmd": ["python3", "~/my_health_rules.py"]` in `~/.config/healthbridge/config.json` and the receiver runs it after every successful archive rebuild (timeout 5 min) — e.g. to flag a resting-HR spike or write numbers into your own notes. Restart `serve` after editing the config; the receiver refuses to start if the config is readable by other users.
+
+Sleep is counted for the night window 18:00 → 12:00, so daytime naps are not included.
 
 ## Security
 

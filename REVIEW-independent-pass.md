@@ -31,3 +31,29 @@ Verified after fixes (local): valid payload accepted while another client stalls
 - No path traversal (`DATE_RE.fullmatch` gates file names); subprocess calls use fixed argv, no shell.
 - BG task identifier in Info.plist matches the runtime id.
 - No personal data in tracked files.
+
+---
+
+# Independent review — v0.2.0
+
+Same fresh-context, read-only reviewer setup; scope: the v0.2.0 diff.
+
+## 🔴 Blockers (fixed)
+- `post_sync_cmd` failures (missing executable, string instead of list) killed the archiver thread silently → validated as a list of strings at startup; every archive/hook run is wrapped and logged.
+- A hanging hook blocked archiving forever → archive timeout 600 s, hook timeout 300 s.
+
+## 🟡 Warnings (fixed)
+- Hook refused when the config is readable/writable by other users.
+- Hook runs only after a successful archive rebuild.
+- Docs: restart `serve` after editing the config; sleep window 18:00 → 12:00 (naps excluded).
+- Health permission text lists every new data type.
+- VO₂ max unit built explicitly (no string parsing).
+- Sleep window uses wall-clock 18:00/12:00 (correct on DST days); `deep_min`/`rem_min` omitted when a source has no stages.
+
+Verified after fixes (local): string hook → refused at start; group-readable config → refused; failing hook logged twice while syncs kept returning 200 and the archive kept rebuilding.
+
+## 🟢 OK
+- Units/scaling for SDNN, walking HR, SpO₂, respiratory rate, mmHg, kg; `.discreteAverage` valid for all types.
+- Sleep interval merge: clipped to the window, overlaps merged once, no off-by-one.
+- Archive header/row column counts match; missing fields render as "—".
+- No private information in the diff.
