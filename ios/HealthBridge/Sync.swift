@@ -19,11 +19,57 @@ final class Sync {
         ("heart_rate", .heartRate),
         ("resting_hr", .restingHeartRate),
     ]
+    /// Daily averages of other discrete measurements: (key, type, unit, scale).
+    let extras: [(String, HKQuantityTypeIdentifier, HKUnit, Double)] = [
+        ("hrv_sdnn_ms", .heartRateVariabilitySDNN, .secondUnit(with: .milli), 1),
+        ("walking_hr_avg", .walkingHeartRateAverage, HKUnit.count().unitDivided(by: .minute()), 1),
+        ("spo2_pct", .oxygenSaturation, .percent(), 100),
+        ("resp_rate", .respiratoryRate, HKUnit.count().unitDivided(by: .minute()), 1),
+        ("vo2max", .vo2Max, HKUnit(from: "ml/kg*min"), 1),
+        ("bp_sys", .bloodPressureSystolic, .millimeterOfMercury(), 1),
+        ("bp_dia", .bloodPressureDiastolic, .millimeterOfMercury(), 1),
+        ("weight_kg", .bodyMass, .gramUnit(with: .kilo), 1),
+    ]
     var readTypes: Set<HKObjectType> {
-        var s: Set<HKObjectType> = [HKObjectType.workoutType()]
+        var s: Set<HKObjectType> = [HKObjectType.workoutType(), HKCategoryType(.sleepAnalysis)]
         for (_, id, _) in sums { s.insert(HKQuantityType(id)) }
         for (_, id) in avgs { s.insert(HKQuantityType(id)) }
+        for (_, id, _, _) in extras { s.insert(HKQuantityType(id)) }
         return s
+    }
+
+    /// Minutes asleep for the night that ends on `day` (18:00 the evening before → 12:00),
+    /// merging overlapping samples from different sources so nothing is counted twice.
+    private func sleep(endingOn dayStart: Date) async -> [String: Double]? {
+        let cal = Calendar.current
+        guard let from = cal.date(byAdding: .hour, value: -6, to: dayStart),
+              let to = cal.date(byAdding: .hour, value: 12, to: dayStart) else { return nil }
+        let samples: [HKCategorySample] = await withCheckedContinuation { c in
+            let pred = HKQuery.predicateForSamples(withStart: from, end: to, options: [])
+            store.execute(HKSampleQuery(sampleType: HKCategoryType(.sleepAnalysis), predicate: pred, limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]) { _, s, _ in
+                c.resume(returning: (s as? [HKCategorySample]) ?? []) })
+        }
+        func merged(_ xs: [HKCategorySample]) -> Double {
+            var total = 0.0, curS: Date?, curE: Date?
+            for x in xs.sorted(by: { $0.startDate < $1.startDate }) {
+                let a = max(x.startDate, from), b = min(x.endDate, to)
+                guard b > a else { continue }
+                if let e = curE, a <= e { curE = max(e, b) } else {
+                    if let s0 = curS, let e = curE { total += e.timeIntervalSince(s0) }
+                    curS = a; curE = b
+                }
+            }
+            if let s0 = curS, let e = curE { total += e.timeIntervalSince(s0) }
+            return (total / 60).rounded()
+        }
+        let asleepValues: Set<Int> = [HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue, HKCategoryValueSleepAnalysis.asleepCore.rawValue,
+                                      HKCategoryValueSleepAnalysis.asleepDeep.rawValue, HKCategoryValueSleepAnalysis.asleepREM.rawValue]
+        let asleep = samples.filter { asleepValues.contains($0.value) }
+        guard !asleep.isEmpty else { return nil }
+        return ["sleep_min": merged(asleep),
+                "deep_min": merged(samples.filter { $0.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue }),
+                "rem_min": merged(samples.filter { $0.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue })]
     }
 
     func authorize() async -> String {
@@ -82,6 +128,10 @@ final class Sync {
                 if k == "heart_rate", let v = s.maximumQuantity()?.doubleValue(for: bpm) { p["heart_rate_max"] = v.rounded() }
             }
         }
+        for (k, id, unit, scale) in extras {
+            if let v = await stat(id, .discreteAverage, start, end)?.averageQuantity()?.doubleValue(for: unit) { p[k] = (v * scale * 10).rounded() / 10 }
+        }
+        if let sl = await sleep(endingOn: start) { for (k, v) in sl { p[k] = v } }
         var ws: [[String: Any]] = []
         for w in await workouts(start, end) {
             var d: [String: Any] = ["type": w.workoutActivityType.rawValue, "start": iso.string(from: w.startDate),

@@ -10,7 +10,7 @@ Get your Apple Watch data out of the iPhone and onto your own Mac — every day,
 
 ## What you get
 
-- **Daily export** — steps, active energy, exercise minutes, heart rate (avg/max), resting heart rate, and every workout (type, duration, kcal, avg/max HR, distance)
+- **Daily export** — steps, active energy, exercise minutes, heart rate (avg/max), resting heart rate, HRV, walking HR, sleep (total/deep/REM), blood oxygen, respiratory rate, VO₂ max, blood pressure, weight, and every workout (type, duration, kcal, avg/max HR, distance)
 - **Full history** — one tap backfills everything in Apple Health, back to your first recorded day
 - **Automatic** — iOS wakes the app when the watch syncs a new workout; the Mac stores one JSON file per day
 - **A readable archive** — a Markdown file with yearly and monthly summaries plus a list of every workout (English or Chinese)
@@ -67,6 +67,10 @@ Check everything at any time:
 python3 mac/healthbridge.py doctor          # or --json
 ```
 
+## Hook your own analysis
+
+Set `"post_sync_cmd": ["python3", "~/my_health_rules.py"]` in `~/.config/healthbridge/config.json` and the receiver runs it after every archive rebuild — e.g. to flag a resting-HR spike or write numbers into your own notes.
+
 ## Security
 
 - Payload: AES-256-GCM; key = SHA-256 of a 256-bit random secret. The secret itself never travels
@@ -94,7 +98,7 @@ python3 mac/healthbridge.py doctor          # or --json
 
 ## Roadmap
 
-- [ ] Sleep, HRV, VO₂ max, blood oxygen
+- [x] Sleep, HRV, VO₂ max, blood oxygen, blood pressure (v0.2)
 - [ ] Optional HTTPS with a pinned self-signed certificate
 - [ ] CSV export and simple charts in the archive
 
