@@ -1,4 +1,5 @@
-// Copy to HealthBridge/Config.swift, or let `python3 mac/healthbridge.py init` write it for you.
+// Copy to HealthBridge/Config.swift (and Local.example.xcconfig to Local.xcconfig),
+// or let `python3 mac/healthbridge.py init` write both for you. xcodegen needs Local.xcconfig.
 // Config.swift is git-ignored: it holds your shared secret.
 enum Config {
     /// Shared secret; the AES-256-GCM key is SHA-256 of this string. Must match the Mac.

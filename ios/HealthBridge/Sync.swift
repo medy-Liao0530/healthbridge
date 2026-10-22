@@ -8,7 +8,7 @@ final class Sync {
     static let taskID = (Bundle.main.bundleIdentifier ?? "HealthBridge") + ".refresh"
     static var defaultEndpoint: String { Config.endpoint }
     let store = HKHealthStore()
-    private(set) var lastSendOK = false
+    private var observersStarted = false
 
     let sums: [(String, HKQuantityTypeIdentifier, HKUnit)] = [
         ("steps", .stepCount, .count()),
@@ -33,6 +33,8 @@ final class Sync {
     }
 
     func startObservers() {
+        guard !observersStarted else { return }
+        observersStarted = true
         for t in [HKObjectType.workoutType(), HKQuantityType(.activeEnergyBurned)] as [HKSampleType] {
             let q = HKObserverQuery(sampleType: t, predicate: nil) { _, done, _ in
                 Task { await self.run(reason: "observer"); done() }
@@ -57,7 +59,7 @@ final class Sync {
 
     private func workouts(_ start: Date, _ end: Date) async -> [HKWorkout] {
         await withCheckedContinuation { c in
-            let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+            let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
             store.execute(HKSampleQuery(sampleType: .workoutType(), predicate: pred, limit: HKObjectQueryNoLimit,
                 sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]) { _, s, _ in
                 c.resume(returning: (s as? [HKWorkout]) ?? []) })
@@ -68,7 +70,7 @@ final class Sync {
         let cal = Calendar.current
         let start = cal.startOfDay(for: day), end = cal.date(byAdding: .day, value: 1, to: start)!
         let iso = ISO8601DateFormatter(); iso.timeZone = .current
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let df = DateFormatter(); df.calendar = Calendar(identifier: .gregorian); df.locale = Locale(identifier: "en_US_POSIX"); df.timeZone = .current; df.dateFormat = "yyyy-MM-dd"
         var p: [String: Any] = ["date": df.string(from: start), "generated_at": iso.string(from: Date())]
         for (k, id, unit) in sums {
             if let v = await stat(id, .cumulativeSum, start, end)?.sumQuantity()?.doubleValue(for: unit) { p[k] = (v * 10).rounded() / 10 }
@@ -109,24 +111,25 @@ final class Sync {
 
     /// Send history in 30-day chunks, oldest first.
     func backfill(days total: Int, progress: @escaping (String) -> Void) async -> String {
+        let anchor = Date()  // fixed for the whole backfill so crossing midnight leaves no gap
         var offset = total
         while offset >= 0 {
             let chunkEnd = max(offset - 29, 0)
-            let r = await runRange(from: offset, to: chunkEnd, reason: "backfill")
+            let (r, ok) = await runRange(from: offset, to: chunkEnd, anchor: anchor)
             progress(L("Backfilling: \(chunkEnd) days left… ", "补传中：还剩 \(chunkEnd) 天… ") + r)
-            if !lastSendOK { return L("Backfill stopped: ", "补传中断：") + r }
+            if !ok { return L("Backfill stopped: ", "补传中断：") + r }
             offset = chunkEnd - 1
         }
         return L("Backfill complete (\(total) days)", "历史补传完成（\(total) 天）")
     }
 
-    private func runRange(from back: Int, to end: Int, reason: String) async -> String {
-        let now = Date()
+    private func runRange(from back: Int, to end: Int, anchor now: Date) async -> (String, Bool) {
         var days: [[String: Any]] = []
         for b in stride(from: back, through: end, by: -1) {
             if let d = Calendar.current.date(byAdding: .day, value: -b, to: now) { days.append(await payload(for: d)) }
         }
-        return await send(days: days, reason: reason).0
+        let r = await send(days: days, reason: "backfill")
+        return (r.status, r.ok)
     }
 
     @discardableResult
@@ -136,20 +139,22 @@ final class Sync {
         for back in stride(from: daysBack, through: 0, by: -1) {
             if let d = Calendar.current.date(byAdding: .day, value: -back, to: now) { days.append(await payload(for: d)) }
         }
-        return await send(days: days, reason: reason)
+        let r = await send(days: days, reason: reason)
+        return (r.status, r.json)
     }
 
-    func send(days: [[String: Any]], reason: String) async -> (String, String) {
-        lastSendOK = false
+    struct SendResult { let status: String; let json: String; var ok = false }
+
+    func send(days: [[String: Any]], reason: String) async -> SendResult {
         let now = Date()
         let body: [String: Any] = ["source": "HealthBridge", "reason": reason, "sent_at": Int(now.timeIntervalSince1970), "days": days]
-        guard let data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys, .prettyPrinted]) else { return (L("Encoding failed", "编码失败"), "") }
+        guard let data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys, .prettyPrinted]) else { return SendResult(status: L("Encoding failed", "编码失败"), json: "") }
         let text = String(data: data, encoding: .utf8) ?? ""
         let saved = UserDefaults.standard.string(forKey: "endpoint")?.trimmingCharacters(in: .whitespaces) ?? ""
-        guard let url = URL(string: saved.isEmpty ? Sync.defaultEndpoint : saved), url.host != nil else { return (L("Invalid receiver address", "接收地址无效"), text) }
+        guard let url = URL(string: saved.isEmpty ? Sync.defaultEndpoint : saved), url.host != nil else { return SendResult(status: L("Invalid receiver address", "接收地址无效"), json: text) }
         let secret = Config.secret
         let key = SymmetricKey(data: SHA256.hash(data: Data(secret.utf8)))
-        guard let sealed = try? AES.GCM.seal(data, using: key).combined else { return (L("Encryption failed", "加密失败"), text) }
+        guard let sealed = try? AES.GCM.seal(data, using: key).combined else { return SendResult(status: L("Encryption failed", "加密失败"), json: text) }
         var urls = [url]
         if let ip = Config.fallbackHost, let fb = URL(string: "http://\(ip):\(Config.port)/health"), fb != url { urls.append(fb) }
         var lastError = ""
@@ -159,11 +164,11 @@ final class Sync {
             do {
                 let (_, resp) = try await URLSession.shared.data(for: req)
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-                if code == 200 { lastSendOK = true; return (L("Sent ", "已发送 ") + "\(Date().formatted(date: .omitted, time: .shortened)) (\(u.host ?? ""))", text) }
-                return (L("Mac answered ", "Mac 返回 ") + "\(code) (\(u.host ?? ""))", text)  // got an answer: never retry elsewhere
+                if code == 200 { return SendResult(status: L("Sent ", "已发送 ") + "\(Date().formatted(date: .omitted, time: .shortened)) (\(u.host ?? ""))", json: text, ok: true) }
+                return SendResult(status: L("Mac answered ", "Mac 返回 ") + "\(code) (\(u.host ?? ""))", json: text)  // got an answer: never retry elsewhere
             } catch { lastError = L("Send failed ", "发送失败 ") + "(\(u.host ?? "")): \(error.localizedDescription)" }
         }
-        return (lastError, text)
+        return SendResult(status: lastError, json: text)
     }
 }
 

@@ -55,7 +55,7 @@ git clone https://github.com/runesleo/healthbridge.git
 cd healthbridge
 python3 -m pip install --user cryptography
 python3 mac/healthbridge.py init --team 你的TeamID   # 生成密钥、配置和 iOS 的 Config.swift
-python3 mac/healthbridge.py serve                    # 保持运行（开机自启见 install.md）
+python3 mac/healthbridge.py serve                    # 保持运行（开机自启见 docs/healthbridge.receiver.plist）
 cd ios && xcodegen generate && open HealthBridge.xcodeproj
 ```
 
@@ -72,7 +72,7 @@ python3 mac/healthbridge.py doctor          # 或加 --json
 - 数据用 AES-256-GCM 加密，钥匙是一个 256 位随机密钥的 SHA-256，密钥本身从不在网上传
 - 解不开的、或 10 分钟前封装的数据包，一律 401 拒收
 - 重放的旧包覆盖不了新数据：每一天只保留 `sent_at` 最新的那份
-- 写文件前校验日期格式（`YYYY-MM-DD`），单次请求上限 4 MB
+- 写入前先校验所有日期（`YYYY-MM-DD`），单次请求上限 4 MB，卡住不发数据的连接 15 秒断开；数据文件权限为 600
 - 手机只在完全连不上 `.local` 名字时才改用 Mac 的局域网 IP，收到任何 HTTP 回应后都不会改发别处
 - 局域网上走明文 HTTP；保密和防篡改靠的是加密封装
 

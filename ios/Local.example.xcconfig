@@ -1,0 +1,3 @@
+// Copy to Local.xcconfig (git-ignored), or let `python3 mac/healthbridge.py init` write it.
+PRODUCT_BUNDLE_IDENTIFIER = com.example.healthbridge
+// DEVELOPMENT_TEAM = YOUR_TEAM_ID

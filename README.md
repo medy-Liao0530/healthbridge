@@ -55,7 +55,7 @@ git clone https://github.com/runesleo/healthbridge.git
 cd healthbridge
 python3 -m pip install --user cryptography
 python3 mac/healthbridge.py init --team YOUR_TEAM_ID     # secret + config + iOS Config.swift
-python3 mac/healthbridge.py serve                        # keep running (see install.md to run at login)
+python3 mac/healthbridge.py serve                        # keep running (run at login: docs/healthbridge.receiver.plist)
 cd ios && xcodegen generate && open HealthBridge.xcodeproj
 ```
 
@@ -72,7 +72,7 @@ python3 mac/healthbridge.py doctor          # or --json
 - Payload: AES-256-GCM; key = SHA-256 of a 256-bit random secret. The secret itself never travels
 - Rejected with 401: anything that does not decrypt, or was sealed more than 10 minutes ago
 - Replays cannot overwrite newer data: each day keeps the payload with the latest `sent_at`
-- Dates are validated (`YYYY-MM-DD`) before any file is written; bodies are capped at 4 MB
+- Every date is validated (`YYYY-MM-DD`) before anything is written; bodies are capped at 4 MB; stalled connections time out after 15 s; data files are created with mode 600
 - The phone only falls back to the Mac's LAN IP when the `.local` name cannot be reached at all, never after an HTTP answer
 - Transport is plain HTTP on your LAN; confidentiality and integrity come from the sealed payload
 

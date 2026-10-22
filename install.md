@@ -4,9 +4,10 @@ You are helping a user install HealthBridge on the Mac you run on. It exports Ap
 
 Run every command from the repository root, in one shell (or reuse full paths).
 
-## 1. Check
+## 1. Get the code and check
 
 ```bash
+git clone https://github.com/runesleo/healthbridge.git && cd healthbridge
 python3 mac/healthbridge.py doctor
 ```
 
@@ -15,18 +16,19 @@ Read each line: `OK`, or `MISSING` with who fixes it (agent / user) and the next
 ## 2. Install
 
 ```bash
-git clone https://github.com/runesleo/healthbridge.git && cd healthbridge
 python3 -m pip install --user cryptography
 brew install xcodegen                      # if missing
 python3 mac/healthbridge.py init           # add --team <TEAM_ID> if the user gives one
 cd ios && xcodegen generate && cd ..
 ```
 
-Keep the receiver running. To start it at login, create a LaunchAgent only after the user agrees (it opens port 8765 on the local network):
+Keep the receiver running:
 
 ```bash
 python3 mac/healthbridge.py serve
 ```
+
+To start it at login, only after the user agrees (it listens on port 8765 on the local network), fill in the paths in `docs/healthbridge.receiver.plist` and follow the commands in its header.
 
 ## 3. Steps only the user can do
 

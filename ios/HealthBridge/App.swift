@@ -12,7 +12,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Sync.taskID, using: nil) { task in
             Sync.schedule()
-            Task { await Sync.shared.run(reason: "bgtask"); task.setTaskCompleted(success: true) }
+            let work = Task { await Sync.shared.run(reason: "bgtask"); task.setTaskCompleted(success: true) }
+            task.expirationHandler = { work.cancel(); task.setTaskCompleted(success: false) }
         }
         Sync.shared.startObservers()
         Sync.schedule()

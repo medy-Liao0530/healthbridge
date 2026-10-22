@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Run the receiver at login. Replace /PATH/TO with real absolute paths, then:
+     cp docs/healthbridge.receiver.plist ~/Library/LaunchAgents/
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/healthbridge.receiver.plist
+     Stop: launchctl bootout gui/$(id -u)/healthbridge.receiver -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>healthbridge.receiver</string>
+  <key>ProgramArguments</key><array>
+    <string>/PATH/TO/python3</string>
+    <string>/PATH/TO/healthbridge/mac/healthbridge.py</string>
+    <string>serve</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>/tmp/healthbridge.log</string>
+</dict></plist>
