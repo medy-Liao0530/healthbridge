@@ -1,0 +1,32 @@
+name: HealthBridge
+options:
+  deploymentTarget:
+    iOS: "17.0"
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+targets:
+  HealthBridge:
+    type: application
+    platform: iOS
+    sources: [HealthBridge]
+    entitlements:
+      path: HealthBridge/HealthBridge.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.background-delivery: true
+    info:
+      path: HealthBridge/Info.plist
+      properties:
+        CFBundleDisplayName: HealthBridge
+        UILaunchScreen: {}
+        NSHealthShareUsageDescription: Reads steps, active energy, exercise minutes, heart rate and workouts, and sends them encrypted to your own Mac.
+        NSLocalNetworkUsageDescription: Sends your encrypted health data to your own Mac on the same Wi-Fi.
+        NSAppTransportSecurity: {NSAllowsLocalNetworking: true}
+        UIBackgroundModes: [fetch, processing]
+        BGTaskSchedulerPermittedIdentifiers: [$(PRODUCT_BUNDLE_IDENTIFIER).refresh]
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"

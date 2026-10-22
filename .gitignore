@@ -1,0 +1,13 @@
+ios/HealthBridge/Config.swift
+ios/Local.xcconfig
+ios/HealthBridge.xcodeproj/
+ios/build/
+build/
+DerivedData/
+*.xcuserstate
+.DS_Store
+.env
+data/
+__pycache__/
+ios/HealthBridge/Info.plist
+ios/HealthBridge/HealthBridge.entitlements
