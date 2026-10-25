@@ -201,7 +201,12 @@ def serve():
     out.mkdir(parents=True, exist_ok=True, mode=0o700)
     threading.Thread(target=archiver, daemon=True).start()
     ThreadingHTTPServer.daemon_threads = True
-    print(f"HealthBridge receiver on {cfg['bind']}:{cfg['port']} -> {out}", file=sys.stderr)
+    # extra_ports: also listen here, e.g. when another service already holds `port` on a VPN address like Tailscale's
+    for port in cfg.get("extra_ports") or []:
+        srv = ThreadingHTTPServer((cfg["bind"], int(port)), Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+    ports = ", ".join(str(x) for x in [cfg["port"], *(cfg.get("extra_ports") or [])])
+    print(f"HealthBridge receiver on {cfg['bind']}:{ports} -> {out}", file=sys.stderr)
     ThreadingHTTPServer((cfg["bind"], int(cfg["port"])), Handler).serve_forever()
 
 

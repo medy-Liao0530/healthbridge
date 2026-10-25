@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 - **Sync health data** action for the Shortcuts app: a personal automation (a time of day, or joining your home Wi-Fi) can sync without opening the app
+- Receiver `extra_ports` config: listen on more ports, e.g. for a Tailscale address where `port` is taken
 - Opening the app syncs; unlocking the phone after a locked background run syncs
 
 ### Fixed
