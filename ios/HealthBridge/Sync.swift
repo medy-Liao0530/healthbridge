@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import HealthKit
 import BackgroundTasks
 import CryptoKit
@@ -186,14 +187,35 @@ final class Sync {
         return (r.status, r.ok)
     }
 
+    /// Last time the Mac accepted a sync; the next run resends every day since then, so a failed send heals itself.
+    static var lastOK: Date? {
+        get { UserDefaults.standard.object(forKey: "lastOK") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "lastOK") }
+    }
+
+    /// Days to resend: at least 2, back to the day of the last accepted sync, at most 60.
+    func catchUpDays(now: Date = Date()) -> Int {
+        guard let last = Sync.lastOK else { return 2 }
+        let cal = Calendar.current
+        let gap = cal.dateComponents([.day], from: cal.startOfDay(for: last), to: cal.startOfDay(for: now)).day ?? 0
+        return min(max(2, gap), 60)
+    }
+
     @discardableResult
-    func run(reason: String, daysBack: Int = 2) async -> (String, String) {
+    func run(reason: String, daysBack: Int? = nil) async -> (String, String) {
+        // Health data is encrypted while the phone is locked: queries come back empty and would overwrite good days on the Mac.
+        guard await MainActor.run(body: { UIApplication.shared.isProtectedDataAvailable }) else {
+            return (L("Phone locked, Health unreadable; will sync after unlock", "手机锁着，读不到健康数据；解锁后再同步"), "")
+        }
         let now = Date()
+        let daysBack = daysBack ?? catchUpDays(now: now)
         var days: [[String: Any]] = []
         for back in stride(from: daysBack, through: 0, by: -1) {
             if let d = Calendar.current.date(byAdding: .day, value: -back, to: now) { days.append(await payload(for: d)) }
         }
         let r = await send(days: days, reason: reason)
+        if r.ok { Sync.lastOK = now }
+        UserDefaults.standard.set(r.status, forKey: "lastStatus")
         return (r.status, r.json)
     }
 

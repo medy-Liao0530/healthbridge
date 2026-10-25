@@ -67,6 +67,10 @@ Check everything at any time:
 python3 mac/healthbridge.py doctor          # or --json
 ```
 
+## Scheduled sync
+
+iOS wakes the app after new workouts, but only on its own schedule, and the Mac has to be reachable at that moment. For a fixed schedule, use the Shortcuts app: **Automation → New → Time of Day** (say 08:00 and 22:30) and/or **Wi-Fi → your home network**, action **HealthBridge → Sync health data**, set to *Run Immediately*. Each run resends every day since the last accepted sync, so a missed one fills itself in. Health data can't be read while the phone is locked; such runs are skipped and retried on unlock.
+
 ## Hook your own analysis
 
 Set `"post_sync_cmd": ["python3", "~/my_health_rules.py"]` in `~/.config/healthbridge/config.json` and the receiver runs it after every successful archive rebuild (timeout 5 min) — e.g. to flag a resting-HR spike or write numbers into your own notes. Restart `serve` after editing the config; the receiver refuses to start if the config is readable by other users.

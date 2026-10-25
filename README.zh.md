@@ -67,6 +67,10 @@ cd ios && xcodegen generate && open HealthBridge.xcodeproj
 python3 mac/healthbridge.py doctor          # 或加 --json
 ```
 
+## 定时同步
+
+新训练后 iOS 会叫醒 App，但时间由系统定，而且那一刻 Mac 得连得上。想要固定时间同步，用「快捷指令」：**自动化 → 新建 → 特定时间**（比如 08:00 和 22:30）和/或 **无线局域网 → 家里的网络**，操作选 **HealthBridge → Sync health data**，设为「立即运行」。每次都会把上次成功之后的每一天重发一遍，漏一次会自动补上。手机锁屏时读不到健康数据，这种情况会跳过，解锁后再同步。
+
 ## 接上你自己的分析
 
 在 `~/.config/healthbridge/config.json` 里加 `"post_sync_cmd": ["python3", "~/my_health_rules.py"]`，接收端每次成功更新档案后就会跑它（超时 5 分钟），比如提醒静息心率异常升高，或把数据写进你自己的笔记。改完配置要重启 `serve`；配置文件如果别的用户也能读写，接收端会拒绝启动。

@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Sync health data** action for the Shortcuts app: a personal automation (a time of day, or joining your home Wi-Fi) can sync without opening the app
+- Opening the app syncs; unlocking the phone after a locked background run syncs
+
+### Fixed
+- A failed send no longer leaves a gap: each run resends every day since the last sync the Mac accepted (up to 60 days)
+- Runs while the phone is locked are skipped instead of sending empty days that overwrote good data on the Mac
+
 ## [0.2.0] - 2026-10-22
 
 ### Added

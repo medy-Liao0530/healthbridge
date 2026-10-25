@@ -19,11 +19,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         Sync.schedule()
         return true
     }
+
+    // Observer or background task fired while locked: catch up as soon as the phone is unlocked.
+    func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
+        Task { await Sync.shared.run(reason: "unlock") }
+    }
 }
 
 struct ContentView: View {
     @AppStorage("endpoint") var endpoint = Sync.defaultEndpoint
-    @State private var status = L("Not synced yet", "未同步")
+    @Environment(\.scenePhase) private var phase
+    @State private var status = UserDefaults.standard.string(forKey: "lastStatus") ?? L("Not synced yet", "未同步")
     @State private var summary = ""
     var body: some View {
         NavigationStack {
@@ -41,6 +47,9 @@ struct ContentView: View {
                 }
                 Section(L("Status", "状态")) { Text(status); if !summary.isEmpty { Text(summary).font(.footnote.monospaced()) } }
             }.navigationTitle("HealthBridge")
+        }
+        .onChange(of: phase) { _, p in
+            if p == .active { Task { status = await Sync.shared.run(reason: "open").0 } }
         }
     }
 }
